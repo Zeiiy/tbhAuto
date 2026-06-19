@@ -21,7 +21,7 @@ from bot.log_watch import LogWatcher, classify_chest_key
 from bot import calib_store
 from bot import updater
 
-APP_VERSION = "1.1.2"
+APP_VERSION = "1.1.3"
 
 
 def resource_dir():
