@@ -52,12 +52,20 @@ Dépendances : `requirements.txt` + `customtkinter pillow pyinstaller` dans `.ve
 
 Dépôt **public** `Zeiiy/tbhAuto` (constantes `GITHUB_OWNER/REPO` dans `updater.py`).
 
-- **Côté app** (`updater.py` + `gui.py`) : au démarrage (exe seulement), un thread
-  interroge `…/releases/latest` ; si `tag_name` > `APP_VERSION`, un bouton ambre
-  **« ↑ Mise à jour X.Y »** apparaît dans l'en-tête. Au clic (confirmation) : télécharge
-  l'asset `TBHBot.exe` en `…\TBHBot.exe.new`, écrit un **.bat relais** (un exe ne peut
-  s'écraser pendant qu'il tourne → le .bat boucle sur `move` jusqu'à ce que l'app quitte,
-  puis relance), puis l'app se ferme. En **dev** (non-frozen) : désactivé.
+- **Côté app** (`updater.py` + `gui.py`) : au démarrage **et toutes les 30 min** (exe
+  seulement), un thread interroge `…/releases/latest` ; si `tag_name` > `APP_VERSION`, un
+  bouton ambre **« ↑ Mise à jour X.Y »** apparaît dans l'en-tête. Au clic (confirmation) :
+  télécharge l'asset `TBHBot.exe` en `…\TBHBot.exe.new`, puis `stage_replace()` écrit un
+  **.bat relais** détaché (le .bat boucle sur `move` jusqu'à ce que l'app quitte — un exe
+  ne peut s'écraser tant qu'il tourne — puis se supprime), un message invite à rouvrir, et
+  l'app se ferme. En **dev** (non-frozen) : désactivé.
+- **PAS de relance auto** (décidé le 2026-06-20) : relancer un exe **onefile** juste après
+  l'avoir réécrit échoue par intermittence — le bootloader extrait `python3xx.dll` pendant
+  que l'antivirus scanne encore le fichier fraîchement écrit → *« failed to load Python DLL
+  / module introuvable »*. Le lancement **manuel** (l'utilisateur rouvre l'exe) est fiable à
+  100% (scan AV terminé). Donc on installe à la fermeture et l'utilisateur double-clique.
+  (Diagnostic : ce n'est ni une var d'env `_MEI*/_PYI*` — testé —, ni réglé par un délai de
+  3 s — testé v1.1.2/1.1.3 —, mais la course extraction/scan AV sur le relancement immédiat.)
 - **Côté CI** (`.github/workflows/release.yml`) : sur un tag `v*`, un runner
   **windows-latest** installe les deps, lance PyInstaller (même commande que
   `build_exe.ps1`) et publie la release avec `TBHBot.exe` (action `softprops/action-gh-release`).

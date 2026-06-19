@@ -25,9 +25,14 @@ Télécharge **`TBHBot.exe`** depuis la page **Releases** du dépôt
 L'antivirus peut bloquer un exe qui automate la souris → autorise-le si besoin.
 
 ### Mises à jour automatiques
-Au démarrage, l'app vérifie s'il existe une version plus récente. Si oui, un bouton
-**« ↑ Mise à jour X.Y »** apparaît en haut : clique-le, et l'app se met à jour et
-redémarre toute seule. (Rien n'est installé sans ton clic.)
+L'app vérifie s'il existe une version plus récente (au démarrage et toutes les 30 min).
+Si oui, un bouton **« ↑ Mise à jour X.Y »** apparaît en haut : clique-le → la nouvelle
+version se télécharge, **l'app se ferme**, et tu n'as plus qu'à **rouvrir `TBHBot.exe`**
+(double-clic) pour terminer. (Rien n'est installé sans ton clic.)
+
+> Pourquoi rouvrir à la main ? Relancer l'app automatiquement juste après l'avoir
+> remplacée peut faire râler l'antivirus (« failed to load Python DLL ») ; rouvrir
+> soi-même est fiable à 100 %.
 
 ## Prérequis à l'écran (avant un run)
 1. Fenêtre du jeu **au premier plan** (même taille que la calibration, sinon
