@@ -21,7 +21,7 @@ from bot.log_watch import LogWatcher, classify_chest_key
 from bot import calib_store
 from bot import updater
 
-APP_VERSION = "1.1.1"
+APP_VERSION = "1.1.2"
 
 
 def resource_dir():
@@ -307,12 +307,17 @@ class App(ctk.CTk):
 
     # ----------------------- mise a jour auto -----------------------
     def _start_update_check(self):
-        """Verifie en tache de fond si une version plus recente est dispo (exe seulement)."""
-        if not updater.is_frozen():
+        """Verifie en tache de fond si une version plus recente est dispo (exe seulement).
+
+        Se reprogramme toutes les 30 min tant qu'aucune maj n'a ete trouvee, pour qu'un
+        run AFK de plusieurs heures voie le bouton apparaitre sans relancer l'app.
+        """
+        if not updater.is_frozen() or self.update_info:
             return
         def work():
             self.update_q.put(updater.check_for_update(APP_VERSION))
         threading.Thread(target=work, daemon=True).start()
+        self.after(30 * 60 * 1000, self._start_update_check)
 
     def _show_update(self, info):
         self.update_info = info
