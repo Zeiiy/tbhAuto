@@ -20,3 +20,8 @@ frontend/dist/
 .vscode/
 .idea/
 *.log
+
+# Artefacts du hook d'auto-doc de fin de session (lisent le transcript prive,
+# chemins en dur -> ne PAS publier ; le doublon docs/ racine vit dans backend/docs).
+backend/parse_*.py
+/docs/

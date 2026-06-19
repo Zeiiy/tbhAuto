@@ -165,3 +165,15 @@
 - Configuration et persistance ItemKey mappings: chest_key_prefixes defaults (91=normal/5min, 92=élite/7min), chest_key_map (surcharge case par case), persistance calibration.json
 - Tests intégration: _test_tail.py (regex GetBoxCount), _test_gui_smoke.py (window launch), _test_assistant.py (queue/timer logic), validations tail/GUI/prefix classification
 - Rebuild TBHBot.exe (67.8 MB) avec LogWatcher et Assistant intégré + documentation CLAUDE.md section "Assistant personnel" finalisée
+
+### 2026-06-19 → 2026-06-20 : système de mise à jour automatique
+- Dépôt public GitHub `Zeiiy/tbhAuto` (git init, `.gitignore`, push) + CI GitHub Actions `.github/workflows/release.yml` : sur un tag `vX.Y.Z`, build PyInstaller sur runner windows-latest puis publication de la release avec `TBHBot.exe`.
+- App : `updater.py` interroge `releases/latest` au démarrage ET toutes les 30 min ; bouton ambre « ↑ Mise à jour X.Y » dans l'en-tête (`gui.py`) ; au clic, téléchargement de l'asset puis remplacement de l'exe.
+- Releases v1.1.0 → v1.1.5 publiées par le CI (1.1.0 = app + Assistant + auto-update ; 1.1.2 = re-check 30 min ; 1.1.4 = flux final ; 1.1.5 = vérification).
+
+### 2026-06-20 : résolution du bug de relancement post-maj (« failed to load Python DLL / module introuvable »)
+- Symptôme : le relancement AUTO de l'exe juste après remplacement échouait par intermittence ; le lancement MANUEL marchait toujours.
+- Écarté par tests : ce n'était PAS les variables d'environnement (`_MEIPASS2`, `_PYI_APPLICATION_HOME_DIR`, `_PYI_ARCHIVE_FILE` mises à des valeurs bidons ne cassent rien), et le délai de 3 s (v1.1.2/v1.1.3) n'a PAS suffi.
+- Cause réelle : course entre l'extraction de `python3xx.dll` par le bootloader onefile et le scan antivirus de l'exe fraîchement réécrit, lors du relancement immédiat.
+- Solution (v1.1.4) : abandon du relancement auto. `updater.stage_replace()` installe le nouvel exe à la fermeture (bat relais qui fait `move` après l'arrêt de l'app, sans relance) ; l'utilisateur rouvre l'exe lui-même (lancement manuel = fiable à 100 %, scan AV terminé). v1.1.5 = vérification du flux, sans erreur.
+- Docs `CLAUDE.md` / `README.md` mises à jour (pourquoi pas de relance auto).
