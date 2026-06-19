@@ -21,7 +21,7 @@ from bot.log_watch import LogWatcher, classify_chest_key
 from bot import calib_store
 from bot import updater
 
-APP_VERSION = "1.1.3"
+APP_VERSION = "1.1.4"
 
 
 def resource_dir():
@@ -332,7 +332,8 @@ class App(ctk.CTk):
         if not messagebox.askyesno(
                 "Mise à jour",
                 f"Installer la version {info['version']} ?\n\n"
-                "L'app va se fermer et redémarrer automatiquement."):
+                "L'app va se fermer pour l'installer ; tu la rouvriras "
+                "(double-clic) pour terminer."):
             return
         self.update_btn.configure(state="disabled", text="Téléchargement… 0%")
 
@@ -352,14 +353,20 @@ class App(ctk.CTk):
         threading.Thread(target=work, daemon=True).start()
 
     def _finish_update(self, dest):
-        self.log_q.put("[maj] installation et redemarrage...")
+        ver = (self.update_info or {}).get("version", "")
         try:
-            updater.apply_and_restart(dest)
+            updater.stage_replace(dest)
         except Exception as e:
             self.log_q.put(f"[maj] echec installation: {e}")
             self.update_btn.configure(state="normal", text="↑Réessayer")
             return
-        self._on_close()   # quitte pour liberer l'exe ; le relais remet en place + relance
+        self.log_q.put("[maj] telechargee, installation a la fermeture")
+        messagebox.showinfo(
+            "Mise à jour prête",
+            f"La version {ver} a été téléchargée.\n\n"
+            "L'app va se fermer pour l'installer, puis rouvre TBHBot.exe "
+            "(double-clic) pour lancer la nouvelle version.")
+        self._on_close()   # quitte pour liberer l'exe ; le relais remet le nouvel exe en place
 
     # --------------------------- controle ---------------------------
     def _toggle_run(self):

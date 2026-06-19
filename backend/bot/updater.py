@@ -83,11 +83,16 @@ def download(url, dest, progress_cb=None, timeout=30):
     return dest
 
 
-def apply_and_restart(new_exe):
-    """Remplace l'exe courant par new_exe et relance, via un .bat relais detache.
+def stage_replace(new_exe):
+    """Programme le remplacement de l'exe courant par new_exe APRES la fermeture de
+    l'app, via un .bat relais detache. L'app doit quitter juste apres (le .bat boucle
+    sur 'move' jusqu'a ce que l'exe soit libere), puis le .bat se supprime.
 
-    L'app DOIT quitter juste apres (pour liberer le verrou sur l'exe) ; le .bat
-    reessaie le 'move' jusqu'a reussite, puis relance, puis se supprime.
+    NE relance PAS l'app : relancer un exe onefile juste apres l'avoir reecrit echoue
+    de facon intermittente ('failed to load Python DLL' / 'module introuvable') car le
+    bootloader extrait python3xx.dll pendant que l'antivirus scanne encore le fichier
+    fraichement ecrit. Le lancement MANUEL (l'utilisateur rouvre l'exe) est fiable a
+    100% car le scan AV est alors termine. On privilegie donc la fiabilite.
     """
     cur = current_exe()
     bat = os.path.join(tempfile.gettempdir(), "tbhbot_update.bat")
@@ -97,17 +102,11 @@ def apply_and_restart(new_exe):
         "set TRIES=0\r\n"
         ":retry\r\n"
         f'move /y "{new_exe}" "{cur}" >nul 2>&1\r\n'
-        "if not errorlevel 1 goto done\r\n"
+        "if not errorlevel 1 goto fin\r\n"
         "set /a TRIES+=1\r\n"
-        "if %TRIES% geq 60 goto fin\r\n"
+        "if %TRIES% geq 120 goto fin\r\n"
         "ping -n 2 127.0.0.1 >nul\r\n"
         "goto retry\r\n"
-        ":done\r\n"
-        # Laisse l'antivirus finir de scanner l'exe fraichement reecrit avant de le
-        # relancer (sinon le bootloader PyInstaller peut echouer : 'failed to load
-        # Python DLL'). ~3s.
-        "ping -n 4 127.0.0.1 >nul\r\n"
-        f'start "" "{cur}"\r\n'
         ":fin\r\n"
         'del "%~f0"\r\n'
     )
