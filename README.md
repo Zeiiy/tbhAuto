@@ -19,9 +19,15 @@ le jeu visible au premier plan. Application de bureau native (`TBHBot.exe`).
   elle détecte le **loot réel** et son **type**.
 
 ## Lancer
-Double-clique **`TBHBot.exe`** (dans `backend/dist/`). Aucune installation requise.
+Télécharge **`TBHBot.exe`** depuis la page **Releases** du dépôt
+(<https://github.com/Zeiiy/tbhAuto/releases>) puis double-clique. Aucune installation requise.
 
 L'antivirus peut bloquer un exe qui automate la souris → autorise-le si besoin.
+
+### Mises à jour automatiques
+Au démarrage, l'app vérifie s'il existe une version plus récente. Si oui, un bouton
+**« ↑ Mise à jour X.Y »** apparaît en haut : clique-le, et l'app se met à jour et
+redémarre toute seule. (Rien n'est installé sans ton clic.)
 
 ## Prérequis à l'écran (avant un run)
 1. Fenêtre du jeu **au premier plan** (même taille que la calibration, sinon

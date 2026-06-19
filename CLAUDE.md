@@ -25,8 +25,12 @@ grades) et **Auto Coffre** (ouvre les coffres).
   - `synthesis.py` — cycle de synthèse (auto-fill + veto couleur).
   - `engine.py` — boucle principale, garde-fous, planification des actions.
   - `calib_store.py` — persistance `calibration.json` + overlay + échantillon HSV.
+  - `log_watch.py` — `LogWatcher` (tail de `player.log`) + `classify_chest_key`,
+    pour l'Assistant personnel (timers de coffres). Voir section dédiée.
+  - `updater.py` — mise à jour auto via GitHub Releases (check/download/relance).
 - **`backend/gui.py`** — **l'application** (customtkinter). Onglets *Contrôle* et
-  *Calibrage*. C'est le point d'entrée réel.
+  *Calibrage*, bouton *Assistant personnel*, bouton de mise à jour. `APP_VERSION`
+  y est défini. C'est le point d'entrée réel.
 - **`backend/templates/`** — PNG des boutons (voir plus bas).
 - **`backend/calibration.json`** — calibration persistée par l'UI ; **surcharge**
   les défauts de `config.py` quand présent (à côté de l'exe en mode build).
@@ -43,6 +47,25 @@ cd backend
 .\build_exe.ps1
 ```
 Dépendances : `requirements.txt` + `customtkinter pillow pyinstaller` dans `.venv`.
+
+## Mise à jour automatique (GitHub Releases + CI) — depuis le 2026-06-19
+
+Dépôt **public** `Zeiiy/tbhAuto` (constantes `GITHUB_OWNER/REPO` dans `updater.py`).
+
+- **Côté app** (`updater.py` + `gui.py`) : au démarrage (exe seulement), un thread
+  interroge `…/releases/latest` ; si `tag_name` > `APP_VERSION`, un bouton ambre
+  **« ↑ Mise à jour X.Y »** apparaît dans l'en-tête. Au clic (confirmation) : télécharge
+  l'asset `TBHBot.exe` en `…\TBHBot.exe.new`, écrit un **.bat relais** (un exe ne peut
+  s'écraser pendant qu'il tourne → le .bat boucle sur `move` jusqu'à ce que l'app quitte,
+  puis relance), puis l'app se ferme. En **dev** (non-frozen) : désactivé.
+- **Côté CI** (`.github/workflows/release.yml`) : sur un tag `v*`, un runner
+  **windows-latest** installe les deps, lance PyInstaller (même commande que
+  `build_exe.ps1`) et publie la release avec `TBHBot.exe` (action `softprops/action-gh-release`).
+
+**Publier une nouvelle version** : bump `APP_VERSION` dans `gui.py` → commit → 
+`git tag vX.Y.Z && git push origin vX.Y.Z`. Le CI build + release ; les exes déjà
+installés proposent la maj. (La 1re version avec updater doit être installée une fois à la
+main — fait pour v1.1.0.) Le build local `build_exe.ps1` reste utile pour tester avant tag.
 
 ## Calibration (fait le 2026-06-17)
 
