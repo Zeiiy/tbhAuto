@@ -103,6 +103,10 @@ def apply_and_restart(new_exe):
         "ping -n 2 127.0.0.1 >nul\r\n"
         "goto retry\r\n"
         ":done\r\n"
+        # Laisse l'antivirus finir de scanner l'exe fraichement reecrit avant de le
+        # relancer (sinon le bootloader PyInstaller peut echouer : 'failed to load
+        # Python DLL'). ~3s.
+        "ping -n 4 127.0.0.1 >nul\r\n"
         f'start "" "{cur}"\r\n'
         ":fin\r\n"
         'del "%~f0"\r\n'
