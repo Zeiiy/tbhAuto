@@ -1,0 +1,22 @@
+# Python / build
+backend/.venv/
+backend/build/
+backend/dist/
+backend/*.spec
+**/__pycache__/
+*.pyc
+
+# Donnees locales / runtime (pas dans le depot)
+backend/calibration.json
+backend/logs/
+backend/dist/calibration.json
+
+# Frontend legacy
+frontend/node_modules/
+frontend/dist/
+
+# Outils / IDE
+.claude/
+.vscode/
+.idea/
+*.log
