@@ -40,6 +40,9 @@ CALIB_FIELDS = [
 SETTINGS_FIELDS = [
     "action_interval_ranges", "tout_ranger_interval_range",
     "ranger_pages", "synthesis_allowed_grades",
+    "assistant_mode",
+    "overlay_enabled", "overlay_monitor", "overlay_corner", "overlay_alpha",
+    "overlay_width", "overlay_offset_x", "overlay_offset_y",
 ]
 PERSIST_FIELDS = CALIB_FIELDS + SETTINGS_FIELDS
 
@@ -74,8 +77,15 @@ def apply_dict(config, data):
                    "stash_grid_rows", "stash_grid_cols",
                    "inventory_grid_rows", "inventory_grid_cols"):
             v = int(v)
-        elif k == "ranger_pages":
+        elif k in ("ranger_pages", "overlay_monitor", "overlay_width",
+                   "overlay_offset_x", "overlay_offset_y"):
             v = int(v)
+        elif k in ("assistant_mode", "overlay_corner"):
+            v = str(v)
+        elif k == "overlay_alpha":
+            v = float(v)
+        elif k == "overlay_enabled":
+            v = bool(v)
         elif k == "synthesis_allowed_grades":
             v = list(v)
         elif k == "action_interval_ranges":

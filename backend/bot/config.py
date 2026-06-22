@@ -78,6 +78,19 @@ class Config:
     chest_key_map: Dict[str, str] = field(default_factory=dict)
     # Periode de lecture (tail) du log par l'assistant (s).
     chest_log_poll_s: float = 0.7
+    # Mode d'affichage de la fenetre Assistant (persiste, bascule par bouton) :
+    #   "detail"  = cartes + timers + barres (defaut)
+    #   "compact" = 2 carres avec LED verte=obtenable / rouge=cooldown
+    #   "overlay" = mini-barre TOUJOURS au-dessus, en haut de l'ecran (deplacable)
+    assistant_mode: str = "detail"           # fenetre Assistant : "detail" ou "compact"
+    # Overlay (facon Discord) pilote depuis l'onglet Overlay du menu principal, persiste :
+    overlay_enabled: bool = False            # affiche l'overlay (au demarrage aussi)
+    overlay_monitor: int = 1                 # ecran cible (index 1..N)
+    overlay_corner: str = "tr"               # coin : tl=haut-g, tr=haut-d, bl=bas-g, br=bas-d
+    overlay_alpha: float = 0.85              # transparence 0.30..1.0 (1 = opaque)
+    overlay_width: int = 190                 # largeur en px (hauteur = barre des taches)
+    overlay_offset_x: int = 0                # decalage fin depuis le coin (px)
+    overlay_offset_y: int = 0
 
     # ===================== SYNTHESE =====================
     # Grades a fusionner, dans l'ordre de priorite. Le bot ne touche QUE ceux-la.

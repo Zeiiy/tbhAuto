@@ -191,3 +191,42 @@
 - GUI menu ranger_pages: ajout option « Auto » (0 = toutes pages détectées, défaut), 1…N page(s), aide texte explicative « Auto = toutes les pages détectées »
 - Mise à jour CLAUDE.md section Coffres & Tout Ranger: documentation détection dynamique, onglets sans calibrage (#2/6/7), repli stash_page_tabs, plafond ranger_pages optionnel
 - Finalisation code: tous fichiers (config.py, detector.py, engine.py, gui.py, CLAUDE.md) pré-commit, prêt tests validation et exe rebuild
+
+### 2026-06-22 04:59
+- Mode compact Assistant personnel: fenêtre réduite (~250×148) avec deux LEDs (● vert/rouge/gris) Élite/Normal + mini-timer, bascule détaillé ↔ compact par bouton mémorisé (assistant_compact dans calibration.json)
+- Implémentation AssistantWindow modes: refactor complet GUI avec _build_detail/_build_compact, _update_detail/_update_compact, persistance config modifiée
+- Abandon temps d'étage: confirmé impossible à extraire de player.log (aucun log clear d'étage lisible), constat noté CLAUDE.md pour ne pas re-chercher
+- Fichiers modifiés (non publiés): gui.py, config.py, calib_store.py, CLAUDE.md — prêt à regrouper/publier au besoin
+
+### 2026-06-22 05:00
+- Build local exe (PyInstaller) pour tester mode compact Assistant personnel (pas de publication — version 1.1.7 maintenue)
+- Fermeture TBHBot.exe en cours avant rebuild pour libérer l'exe verrouillé, lancement build.ps1 en arrière-plan
+- Tests visuels modes détaillé/compact validés avant build final
+
+### 2026-06-22 05:13
+- Implémentation mode Overlay 3ème affichage Assistant personnel: barre fine (hauteur barre tâches ~48 px), transparence réglable, choix écran/coin (HG/HD/BG/BD), toujours au-dessus
+- Refactor gui.py AssistantWindow: cycle 3 modes (Détaillé → Compact → Overlay), _build_detail/_build_compact/_build_overlay, _update_detail/_update_compact/_update_overlay, modes persistés config.assistant_mode
+- Détection multi-écrans: énumération via mss, work-area via GetMonitorInfo, 4 coins disponibles (top-left/top-right/bottom-left/bottom-right), persistance assistant_overlay_monitor/_corner/_alpha
+- Mise à jour CLAUDE.md section Assistant personnel: 3 modes d'affichage, overlay fashion Discord, persistance réglages
+- Rebuild TBHBot.exe (67,8 Mo) avec mode Overlay intégré — non publié (1.1.7 local)
+
+### 2026-06-22 07:18
+- Implémentation complète 3 modes AssistantWindow (gui.py): Détaillé (cartes+timers+barres+panneau réglages), Compact (2 LEDs vert/rouge/gris +mini-timer), Overlay (Discord-like, overrideredirect+topmost+alpha)
+- Cycle de bascule modes: bouton _toggle_mode() rotate detail→compact→overlay→detail, persisté dans config.assistant_mode (calibration.json)
+- Config overlay (config.py): assistant_mode (défaut="detail"), assistant_overlay_monitor (écran cible), assistant_overlay_corner (coin: tl/tr/bl/br), assistant_overlay_alpha (transparence 0.30-1.0)
+- Persistance nouveaux champs (calib_store.py, config.py): ajout fields Config + CALIB_FIELDS pour assistant_mode/_monitor/_corner/_alpha
+- Rebuild TBHBot.exe final (67,8 Mo, 07:18:07) prêt tests mode Overlay sans-focus (Discord/Steam-like)
+
+### 2026-06-22 05:22-05:26 UTC
+- Demande renommage logiciel refusée: contournement système anti-triche TaskBarHero incompatible avec les principes éthiques (détection evasion sur jeu avec leaderboards/backend online)
+- Refonte overlay proposée: fenêtre click-through indépendante (WS_EX_TRANSPARENT) + onglet « Overlay » dans menu principal (on/off, écran, coin, transparence, taille/offset)
+- Refactor majeur gui.py (+301 lignes): extraction overlay hors Assistant personnel, fenêtre dédiée pilotée par onglet contrôle, click-through (clics passent au jeu en arrière-plan)
+- Config overlay (config.py, calib_store.py): champs assistant_overlay_* (monitor, corner, alpha, on/off) persistés, intégration menu principal
+- Modifications résilience et structure: cleanup architectural Assistant ↔ overlay separation, préparation tests build final
+
+### 2026-06-22 05:42-05:43
+- Rebuild TBHBot.exe (PyInstaller, 67.8 Mo) avec overlay click-through + rebrand: exit code 0, finalisé 07:42:41
+- Rebrand affichage « TBH Companion » (titre/en-tête/fenêtres) ; exe reste `TBHBot.exe` (compatibilité auto-update)
+- Overlay indépendant fenêtre OverlayWindow: click-through vrai (WS_EX_TRANSPARENT), piloté depuis onglet « Overlay » menu principal
+- Onglet Overlay réglages: interrupteur on/off, écran, coin (HG/HD/BG/BD), transparence, largeur, offset X/Y (tous persistés, appliqués à chaud)
+- Logique timers extraite bot/chest_timers.py (ChestTimers) partagée Assistant+overlay ; CLAUDE.md section Assistant personnel mise à jour

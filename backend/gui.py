@@ -17,11 +17,13 @@ from PIL import Image, ImageTk
 
 from bot.config import Config
 from bot.engine import BotEngine
-from bot.log_watch import LogWatcher, classify_chest_key
+from bot.log_watch import classify_chest_key
+from bot.chest_timers import ChestTimers
 from bot import calib_store
 from bot import updater
 
-APP_VERSION = "1.1.7"
+APP_VERSION = "1.1.8"
+APP_NAME = "TBH Companion"   # nom affiche (titre/en-tete/fenetres). L'exe reste TBHBot.exe.
 
 
 def resource_dir():
@@ -63,12 +65,19 @@ CHESTS_UI = [
     ("elite", "Coffre Élite", GOLD, "boss de fin de run · 7 min"),
     ("normal", "Coffre Normal", BLUE, "monstres normaux · 5 min"),
 ]
+# Modes de la fenetre Assistant (bascule Detaille <-> Compact). L'overlay est, lui,
+# une fenetre INDEPENDANTE pilotee par l'onglet Overlay du menu principal.
+ASSIST_NEXT = {"detail": "compact", "compact": "detail"}
+ASSIST_LABEL = {"detail": "Détaillé", "compact": "Compact"}
+ASSIST_MODES = tuple(ASSIST_LABEL)
+CORNER_LABEL = {"tl": "Haut-gauche", "tr": "Haut-droite",
+                "bl": "Bas-gauche", "br": "Bas-droite"}
 
 
 class App(ctk.CTk):
     def __init__(self):
         super().__init__()
-        self.title(f"TBH AFK Bot  v{APP_VERSION}")
+        self.title(f"{APP_NAME}  v{APP_VERSION}")
         self.geometry("880x920")
         self.minsize(840, 800)
 
@@ -85,6 +94,7 @@ class App(ctk.CTk):
         self.countdowns = {}         # feature key -> (label, nd_key)
         self.calib_entries = {}
         self.assistant_win = None
+        self.overlay_win = None
         self.update_q = queue.Queue()
         self.update_info = None
         self._imgtk = None
@@ -97,13 +107,14 @@ class App(ctk.CTk):
         self.protocol("WM_DELETE_WINDOW", self._on_close)
         self.after(150, self._drain_logs)
         self.after(400, self._refresh_state)
+        self.after(600, self._restore_overlay)
         self.after(1500, self._start_update_check)
 
     # ------------------------------ UI ------------------------------
     def _build(self):
         head = ctk.CTkFrame(self, fg_color="transparent")
         head.pack(fill="x", padx=18, pady=(14, 2))
-        ctk.CTkLabel(head, text="TBH AFK Bot",
+        ctk.CTkLabel(head, text=APP_NAME,
                      font=ctk.CTkFont(size=22, weight="bold")).pack(side="left")
         ctk.CTkButton(head, text="Assistant personnel", width=168, height=30,
                       fg_color="#6366f1", hover_color="#818cf8", text_color="white",
@@ -126,6 +137,7 @@ class App(ctk.CTk):
         self.tabs = ctk.CTkTabview(self, corner_radius=12)
         self.tabs.pack(fill="both", expand=True, padx=12, pady=10)
         self._build_control(self.tabs.add("Contrôle"))
+        self._build_overlay_tab(self.tabs.add("Overlay"))
         self._build_calib(self.tabs.add("Calibrage"))
 
     def _build_control(self, parent):
@@ -311,6 +323,114 @@ class App(ctk.CTk):
             self.assistant_win.focus()
             return
         self.assistant_win = AssistantWindow(self, self.cfg)
+
+    # ------------------------------ overlay -------------------------
+    def _build_overlay_tab(self, parent):
+        head = ctk.CTkFrame(parent, corner_radius=14)
+        head.pack(fill="x", padx=6, pady=(10, 6))
+        htop = ctk.CTkFrame(head, fg_color="transparent")
+        htop.pack(fill="x", padx=16, pady=(14, 2))
+        ctk.CTkLabel(htop, text="Overlay",
+                     font=ctk.CTkFont(size=16, weight="bold")).pack(side="left")
+        self.overlay_var = ctk.BooleanVar(value=bool(self.cfg.overlay_enabled))
+        ctk.CTkSwitch(htop, text="", variable=self.overlay_var, width=48,
+                      progress_color=ACCENT, command=self._toggle_overlay).pack(side="right")
+        ctk.CTkLabel(head, text="Mini-barre transparente, toujours au-dessus du jeu, "
+                     "NON cliquable (les clics passent au jeu). Affiche les timers de coffres.",
+                     text_color=MUTED, wraplength=780, justify="left",
+                     anchor="w").pack(fill="x", padx=16, pady=(0, 12))
+
+        card = ctk.CTkFrame(parent, corner_radius=14)
+        card.pack(fill="x", padx=6, pady=6)
+        nmon = max(1, len(list_monitors()))
+
+        r1 = ctk.CTkFrame(card, fg_color="transparent"); r1.pack(fill="x", padx=16, pady=(16, 6))
+        ctk.CTkLabel(r1, text="Écran").pack(side="left")
+        self.ov_mon = ctk.StringVar(value=str(min(int(self.cfg.overlay_monitor), nmon)))
+        ctk.CTkOptionMenu(r1, values=[str(i) for i in range(1, nmon + 1)], width=64,
+                          variable=self.ov_mon,
+                          command=lambda _v: self._apply_overlay()).pack(side="left", padx=(8, 20))
+        ctk.CTkLabel(r1, text="Coin").pack(side="left")
+        self.ov_corner = ctk.StringVar(value=CORNER_LABEL.get(self.cfg.overlay_corner, "Haut-droite"))
+        ctk.CTkOptionMenu(r1, values=list(CORNER_LABEL.values()), width=150,
+                          variable=self.ov_corner,
+                          command=lambda _v: self._apply_overlay()).pack(side="left", padx=8)
+
+        r2 = ctk.CTkFrame(card, fg_color="transparent"); r2.pack(fill="x", padx=16, pady=6)
+        ctk.CTkLabel(r2, text="Transparence").pack(side="left")
+        self.ov_alpha = ctk.CTkSlider(r2, from_=0.3, to=1.0, number_of_steps=14,
+                                      command=lambda _v: self._apply_overlay())
+        self.ov_alpha.set(float(self.cfg.overlay_alpha))
+        self.ov_alpha.pack(side="left", fill="x", expand=True, padx=10)
+        self.ov_alpha_lbl = ctk.CTkLabel(r2, text="", width=46)
+        self.ov_alpha_lbl.pack(side="left")
+
+        r3 = ctk.CTkFrame(card, fg_color="transparent"); r3.pack(fill="x", padx=16, pady=(6, 16))
+        self.ov_w = self._mini_entry(r3, "Largeur", self.cfg.overlay_width, (0, 12))
+        self.ov_ox = self._mini_entry(r3, "Décalage X", self.cfg.overlay_offset_x, (0, 6))
+        self.ov_oy = self._mini_entry(r3, "Y", self.cfg.overlay_offset_y, (0, 6))
+
+        ctk.CTkLabel(parent, text="Astuce : ajuste Décalage X/Y pour coller pile au bord. "
+                     "L'overlay ne capte aucun clic — tout passe au jeu.",
+                     text_color=MUTED, font=ctk.CTkFont(size=11),
+                     wraplength=780, justify="left").pack(fill="x", padx=14, pady=8)
+        self._apply_overlay()   # initialise le libelle % (et applique si overlay ouvert)
+
+    def _mini_entry(self, parent, label, value, pad):
+        ctk.CTkLabel(parent, text=label).pack(side="left", padx=(pad[0], 6))
+        e = ctk.CTkEntry(parent, width=58); e.pack(side="left", padx=(0, pad[1]))
+        e.insert(0, str(value))
+        e.bind("<FocusOut>", lambda _e: self._apply_overlay())
+        e.bind("<Return>", lambda _e: self._apply_overlay())
+        return e
+
+    def _restore_overlay(self):
+        if getattr(self.cfg, "overlay_enabled", False):
+            self._open_overlay()
+
+    def _toggle_overlay(self):
+        self.cfg.overlay_enabled = bool(self.overlay_var.get())
+        self._save_overlay_cfg()
+        if self.cfg.overlay_enabled:
+            self._open_overlay()
+        else:
+            self._close_overlay()
+
+    def _open_overlay(self):
+        if self.overlay_win is not None and self.overlay_win.winfo_exists():
+            return
+        self.overlay_win = OverlayWindow(self, self.cfg)
+
+    def _close_overlay(self):
+        if self.overlay_win is not None and self.overlay_win.winfo_exists():
+            self.overlay_win.close()
+        self.overlay_win = None
+
+    def _apply_overlay(self, _=None):
+        try:
+            self.cfg.overlay_monitor = int(self.ov_mon.get())
+        except Exception:
+            pass
+        inv = {v: k for k, v in CORNER_LABEL.items()}
+        self.cfg.overlay_corner = inv.get(self.ov_corner.get(), "tr")
+        self.cfg.overlay_alpha = round(float(self.ov_alpha.get()), 2)
+        self.ov_alpha_lbl.configure(text=f"{int(self.cfg.overlay_alpha * 100)}%")
+        for attr, e in (("overlay_width", self.ov_w),
+                        ("overlay_offset_x", self.ov_ox),
+                        ("overlay_offset_y", self.ov_oy)):
+            try:
+                setattr(self.cfg, attr, int(e.get()))
+            except Exception:
+                pass
+        self._save_overlay_cfg()
+        if self.overlay_win is not None and self.overlay_win.winfo_exists():
+            self.overlay_win.refresh_settings()
+
+    def _save_overlay_cfg(self):
+        try:
+            calib_store.save(self.cfg)
+        except Exception:
+            pass
 
     # ----------------------- mise a jour auto -----------------------
     def _start_update_check(self):
@@ -613,53 +733,166 @@ class App(ctk.CTk):
         except Exception:
             pass
         try:
+            self._close_overlay()
+        except Exception:
+            pass
+        try:
             self.engine.stop()
         except Exception:
             pass
         self.destroy()
 
 
-class AssistantWindow(ctk.CTkToplevel):
-    """Fenetre detachable : timers de coffres bases sur le LOG du jeu (player.log).
+# ----------------------- helpers ecrans / overlay -----------------------
+def list_monitors():
+    """Liste des ecrans : [{left, top, width, height, taskbar}], gauche->droite."""
+    try:
+        import mss
+        with mss.mss() as sct:
+            raw = list(sct.monitors[1:])    # [0] = ecran virtuel combine -> ignore
+    except Exception:
+        raw = []
+    return [_work_area(m) for m in raw]
 
-    Lit en direct les acquisitions "GetBoxCount ... ItemKey : KEY", relance le
-    compte a rebours du type correspondant (normal 5 min / elite 7 min) et affiche
-    "Obtenable" quand il est ecoule. Ne clique jamais : c'est le bot qui ouvre les
-    coffres. Les types sont reconnus via cfg.chest_key_map (910501 normal, 920501 elite).
-    """
+
+def _work_area(mon):
+    """Rect de TRAVAIL d'un ecran (exclut la barre des taches) via GetMonitorInfo ;
+    'taskbar' = hauteur de la barre. Repli sur le rect brut si indispo."""
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        class RECT(ctypes.Structure):
+            _fields_ = [("left", wintypes.LONG), ("top", wintypes.LONG),
+                        ("right", wintypes.LONG), ("bottom", wintypes.LONG)]
+
+        class MI(ctypes.Structure):
+            _fields_ = [("cbSize", wintypes.DWORD), ("rcMonitor", RECT),
+                        ("rcWork", RECT), ("dwFlags", wintypes.DWORD)]
+
+        u = ctypes.windll.user32
+        pt = wintypes.POINT(int(mon["left"] + mon["width"] / 2),
+                            int(mon["top"] + mon["height"] / 2))
+        hmon = u.MonitorFromPoint(pt, 2)    # MONITOR_DEFAULTTONEAREST
+        mi = MI(); mi.cbSize = ctypes.sizeof(MI)
+        if u.GetMonitorInfoW(hmon, ctypes.byref(mi)):
+            w = mi.rcWork
+            return {"left": w.left, "top": w.top,
+                    "width": w.right - w.left, "height": w.bottom - w.top,
+                    "taskbar": max(0, mon["height"] - (w.bottom - w.top))}
+    except Exception:
+        pass
+    return {"left": mon["left"], "top": mon["top"],
+            "width": mon["width"], "height": mon["height"], "taskbar": 40}
+
+
+def _make_click_through(window):
+    """WS_EX_NOACTIVATE + TRANSPARENT + TOOLWINDOW + LAYERED : la fenetre reste
+    au-dessus, sans focus ET click-through (les clics passent au jeu dessous), facon
+    Discord/Steam. -> le jeu reste actif (le bot ne se met pas en pause) et l'overlay
+    n'est PAS cliquable (tout reglage se fait depuis l'onglet Overlay)."""
+    try:
+        import ctypes
+        from ctypes import wintypes
+        GWL_EXSTYLE = -20
+        WS_EX_TRANSPARENT = 0x00000020
+        WS_EX_NOACTIVATE = 0x08000000
+        WS_EX_TOOLWINDOW = 0x00000080
+        WS_EX_LAYERED = 0x00080000
+        GA_ROOT = 2
+        u = ctypes.windll.user32
+        u.GetAncestor.restype = wintypes.HWND
+        u.GetAncestor.argtypes = [wintypes.HWND, wintypes.UINT]
+        hwnd = u.GetAncestor(window.winfo_id(), GA_ROOT) or window.winfo_id()
+        longptr = ctypes.sizeof(ctypes.c_void_p) == 8
+        getf = u.GetWindowLongPtrW if longptr else u.GetWindowLongW
+        setf = u.SetWindowLongPtrW if longptr else u.SetWindowLongW
+        getf.restype = ctypes.c_ssize_t
+        getf.argtypes = [wintypes.HWND, ctypes.c_int]
+        setf.restype = ctypes.c_ssize_t
+        setf.argtypes = [wintypes.HWND, ctypes.c_int, ctypes.c_ssize_t]
+        ex = getf(hwnd, GWL_EXSTYLE)
+        setf(hwnd, GWL_EXSTYLE,
+             ex | WS_EX_TRANSPARENT | WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW | WS_EX_LAYERED)
+        u.SetWindowPos.argtypes = [wintypes.HWND, wintypes.HWND, ctypes.c_int,
+                                   ctypes.c_int, ctypes.c_int, ctypes.c_int, wintypes.UINT]
+        # NOSIZE | NOMOVE | NOACTIVATE | FRAMECHANGED ; re-affirme TOPMOST
+        u.SetWindowPos(hwnd, wintypes.HWND(-1), 0, 0, 0, 0,
+                       0x0001 | 0x0002 | 0x0010 | 0x0020)
+    except Exception:
+        pass
+
+
+def mmss(sec):
+    sec = max(0, int(round(sec)))
+    return f"{sec // 60}:{sec % 60:02d}"
+
+
+def ago(sec):
+    sec = max(0, int(sec))
+    if sec < 60:
+        return f"{sec}s"
+    if sec < 3600:
+        return f"{sec // 60}m{sec % 60:02d}s"
+    return f"{sec // 3600}h{(sec % 3600) // 60:02d}m"
+
+
+class AssistantWindow(ctk.CTkToplevel):
+    """Fenetre detachable : timers de coffres (player.log) en mode Detaille ou Compact.
+    Ne clique jamais. L'overlay est, lui, une fenetre separee (OverlayWindow)."""
 
     def __init__(self, master, cfg):
         super().__init__(master)
         self.cfg = cfg
         self.title("Assistant personnel")
-        self.geometry("360x300")
-        self.minsize(300, 260)
         self.configure(fg_color="#0d1117")
-
-        self.events = queue.Queue()
-        self.cooldown_end = {"normal": 0.0, "elite": 0.0}  # 0 = jamais vu
-        self.last_seen = {"normal": 0.0, "elite": 0.0}
-        self.last_box = None        # (item_key, ts) du dernier coffre vu (tout type)
         self.cards = {}
-
+        self.timers = ChestTimers(cfg)
+        self.mode = getattr(cfg, "assistant_mode", "detail")
+        if self.mode not in ASSIST_MODES:
+            self.mode = "detail"
         self._build()
-        self.watcher = LogWatcher(cfg, on_box=self._on_box)
-        self.watcher.start()
+        self.timers.start()
         self.protocol("WM_DELETE_WINDOW", self._on_close)
         self.after(150, self._tick)
 
-    # le callback tourne dans le thread du watcher -> on passe par une queue
-    def _on_box(self, key, count, ts):
-        self.events.put((key, ts))
+    def _clear(self):
+        for w in self.winfo_children():
+            w.destroy()
+        self.cards = {}
 
-    # ------------------------------ UI ------------------------------
     def _build(self):
+        self._clear()
+        if self.mode == "compact":
+            self.minsize(220, 132); self.geometry("250x148")
+            self._build_compact()
+        else:
+            self.mode = "detail"
+            self.minsize(300, 300); self.geometry("360x380")
+            self._build_detail()
+
+    def _toggle_btn(self, parent, width=84):
+        ctk.CTkButton(parent, text=ASSIST_LABEL[ASSIST_NEXT[self.mode]],
+                      width=width, height=24, fg_color="#21262d",
+                      hover_color="#30363d", font=ctk.CTkFont(size=11),
+                      command=self._toggle_mode).pack(side="right")
+
+    def _toggle_mode(self):
+        self.mode = ASSIST_NEXT.get(self.mode, "detail")
+        self.cfg.assistant_mode = self.mode
+        try:
+            calib_store.save(self.cfg)
+        except Exception:
+            pass
+        self._build()
+
+    # ---- mode detaille : timers + barres (par defaut) ----
+    def _build_detail(self):
         head = ctk.CTkFrame(self, fg_color="transparent")
         head.pack(fill="x", padx=14, pady=(12, 2))
         ctk.CTkLabel(head, text="Assistant personnel",
                      font=ctk.CTkFont(size=16, weight="bold")).pack(side="left")
-        ctk.CTkLabel(head, text="timers de coffres", text_color=MUTED,
-                     font=ctk.CTkFont(size=11)).pack(side="left", padx=8)
+        self._toggle_btn(head)
 
         body = ctk.CTkFrame(self, fg_color="transparent")
         body.pack(fill="both", expand=True, padx=10, pady=4)
@@ -669,6 +902,33 @@ class AssistantWindow(ctk.CTkToplevel):
         self.status_lbl = ctk.CTkLabel(self, text="", text_color=MUTED,
                                        font=ctk.CTkFont(size=11), anchor="w")
         self.status_lbl.pack(fill="x", padx=14, pady=(0, 8))
+
+    # ---- mode compact : 2 carres avec LED verte (obtenable) / rouge (cooldown) ----
+    def _build_compact(self):
+        head = ctk.CTkFrame(self, fg_color="transparent")
+        head.pack(fill="x", padx=8, pady=(6, 0))
+        self._toggle_btn(head)
+
+        body = ctk.CTkFrame(self, fg_color="transparent")
+        body.pack(fill="both", expand=True, padx=8, pady=(2, 8))
+        body.grid_columnconfigure((0, 1), weight=1, uniform="led")
+        body.grid_rowconfigure(0, weight=1)
+        for i, (ctype, label, color, _sub) in enumerate(CHESTS_UI):
+            self.cards[ctype] = self._led_square(body, i, ctype, label, color)
+
+    def _led_square(self, parent, col, ctype, label, color):
+        sq = ctk.CTkFrame(parent, corner_radius=12, fg_color="#161b22",
+                          border_width=2, border_color=color)
+        sq.grid(row=0, column=col, sticky="nsew", padx=4, pady=2)
+        ctk.CTkLabel(sq, text=label.replace("Coffre ", ""), text_color=color,
+                     font=ctk.CTkFont(size=12, weight="bold")).pack(pady=(8, 0))
+        led = ctk.CTkLabel(sq, text="●", text_color="#30363d",
+                           font=ctk.CTkFont(size=34))
+        led.pack()
+        timer = ctk.CTkLabel(sq, text="--:--", text_color=MUTED,
+                             font=ctk.CTkFont(family="Consolas", size=13, weight="bold"))
+        timer.pack(pady=(0, 8))
+        return {"led": led, "timer": timer, "color": color}
 
     def _chest_card(self, parent, ctype, label, color, sub):
         card = ctk.CTkFrame(parent, corner_radius=14, fg_color="#161b22")
@@ -693,82 +953,162 @@ class AssistantWindow(ctk.CTkToplevel):
         return {"timer": timer, "bar": bar, "sub": subl, "state": state, "color": color}
 
     # ----------------------------- logique --------------------------
-    def _ingest(self, key, ts):
-        self.last_box = (key, ts)
-        ctype = classify_chest_key(self.cfg, key)
-        if ctype in self.cooldown_end:
-            cd = float(self.cfg.chest_cooldowns_s.get(ctype, 300.0))
-            self.cooldown_end[ctype] = ts + cd
-            self.last_seen[ctype] = ts
-
     def _tick(self):
-        try:
-            while True:
-                key, ts = self.events.get_nowait()
-                self._ingest(key, ts)
-        except queue.Empty:
-            pass
-
+        self.timers.drain()
         now = time.time()
-        mapped_types = set(self.cfg.chest_key_prefixes.values()) | set(self.cfg.chest_key_map.values())
+        if self.mode == "compact":
+            self._update_compact(now)
+        else:
+            self._update_detail(now)
+        self.after(250, self._tick)
+
+    def _update_detail(self, now):
         for ctype, c in self.cards.items():
-            total = float(self.cfg.chest_cooldowns_s.get(ctype, 300.0))
-            end = self.cooldown_end[ctype]
-            if ctype not in mapped_types:
+            st, rem, total = self.timers.state(ctype, now)
+            if st == "unset":
                 c["timer"].configure(text="non réglé", text_color=MUTED)
                 c["state"].configure(text="—", text_color=MUTED)
                 c["bar"].configure(progress_color="#30363d"); c["bar"].set(0)
                 c["sub"].configure(text="type non configuré (chest_key_prefixes)")
-            elif end <= 0:
+            elif st == "idle":
                 c["timer"].configure(text="--:--", text_color=MUTED)
                 c["state"].configure(text="en veille", text_color=MUTED)
                 c["bar"].configure(progress_color="#30363d"); c["bar"].set(0)
                 c["sub"].configure(text="aucun loot détecté pour l'instant")
+            elif st == "cooldown":
+                c["timer"].configure(text=mmss(rem), text_color=c["color"])
+                c["state"].configure(text="cooldown", text_color=c["color"])
+                c["bar"].configure(progress_color=c["color"])
+                c["bar"].set(max(0.0, min(1.0, 1 - rem / total)))
+                c["sub"].configure(text="dernier loot il y a " + ago(now - self.timers.last_seen[ctype]))
             else:
-                rem = end - now
-                if rem > 0:
-                    c["timer"].configure(text=self._mmss(rem), text_color=c["color"])
-                    c["state"].configure(text="cooldown", text_color=c["color"])
-                    c["bar"].configure(progress_color=c["color"])
-                    c["bar"].set(max(0.0, min(1.0, 1 - rem / total)))
-                    c["sub"].configure(text="dernier loot il y a " + self._ago(now - self.last_seen[ctype]))
-                else:
-                    c["timer"].configure(text="Obtenable", text_color=GREEN)
-                    c["state"].configure(text="✓ prêt", text_color=GREEN)
-                    c["bar"].configure(progress_color=GREEN); c["bar"].set(1.0)
-                    c["sub"].configure(text="lootable maintenant")
+                c["timer"].configure(text="Obtenable", text_color=GREEN)
+                c["state"].configure(text="✓ prêt", text_color=GREEN)
+                c["bar"].configure(progress_color=GREEN); c["bar"].set(1.0)
+                c["sub"].configure(text="lootable maintenant")
 
-        st = self.watcher.status if self.watcher else "—"
         extra = ""
-        if self.last_box:
-            key, ts = self.last_box
+        if self.timers.last_box:
+            key, ts = self.timers.last_box
             lbl = {"normal": "normal", "elite": "élite"}.get(
                 classify_chest_key(self.cfg, key), f"clé {key}")
-            extra = f" · dernier : {lbl} il y a {self._ago(now - ts)}"
-        self.status_lbl.configure(text=f"surveillance : {st}{extra}")
-        self.after(250, self._tick)
+            extra = f" · dernier : {lbl} il y a {ago(now - ts)}"
+        self.status_lbl.configure(text=f"surveillance : {self.timers.status}{extra}")
 
-    @staticmethod
-    def _mmss(sec):
-        sec = max(0, int(round(sec)))
-        return f"{sec // 60}:{sec % 60:02d}"
-
-    @staticmethod
-    def _ago(sec):
-        sec = max(0, int(sec))
-        if sec < 60:
-            return f"{sec}s"
-        if sec < 3600:
-            return f"{sec // 60}m{sec % 60:02d}s"
-        return f"{sec // 3600}h{(sec % 3600) // 60:02d}m"
+    def _update_compact(self, now):
+        for ctype, c in self.cards.items():
+            st, rem, _ = self.timers.state(ctype, now)
+            if st in ("unset", "idle"):
+                c["led"].configure(text_color="#30363d")
+                c["timer"].configure(text="--:--", text_color=MUTED)
+            elif st == "cooldown":
+                c["led"].configure(text_color=RED)
+                c["timer"].configure(text=mmss(rem), text_color=c["color"])
+            else:
+                c["led"].configure(text_color=GREEN)
+                c["timer"].configure(text="prêt", text_color=GREEN)
 
     def _on_close(self):
+        self.timers.stop()
+        self.destroy()
+
+
+class OverlayWindow(ctk.CTkToplevel):
+    """Overlay facon Discord : mini-barre TOUJOURS au-dessus, TRANSPARENTE et
+    CLICK-THROUGH (les clics passent au jeu -> non cliquable). Pilotee 100% depuis
+    l'onglet Overlay (on/off, ecran, coin, transparence, largeur, offset). Hauteur =
+    barre des taches. Lit player.log via ChestTimers ; ne clique jamais."""
+
+    def __init__(self, master, cfg):
+        super().__init__(master)
+        self.cfg = cfg
+        self.overrideredirect(True)
+        self.configure(fg_color="#0d1117")
+        self.cards = {}
+        self.timers = ChestTimers(cfg)
+        self._build()
+        self.apply_geometry()
+        self.apply_alpha()
+        self.timers.start()
+        self.after(80, lambda: _make_click_through(self))
+        self.after(250, self._tick)
+
+    def _build(self):
+        strip = ctk.CTkFrame(self, corner_radius=8, fg_color="#0d1117",
+                             border_width=1, border_color="#30363d")
+        strip.pack(fill="both", expand=True)
+        for ctype, label, color, _sub in CHESTS_UI:
+            cell = ctk.CTkFrame(strip, fg_color="transparent")
+            cell.pack(side="left", expand=True)
+            led = ctk.CTkLabel(cell, text="●", text_color="#30363d",
+                               font=ctk.CTkFont(size=15))
+            led.pack(side="left", padx=(10, 3))
+            timer = ctk.CTkLabel(cell, text="--", text_color=MUTED,
+                                 font=ctk.CTkFont(family="Consolas", size=13, weight="bold"))
+            timer.pack(side="left", padx=(0, 6))
+            self.cards[ctype] = {"led": led, "timer": timer, "color": color}
+
+    def apply_geometry(self):
+        mons = list_monitors()
+        idx = int(getattr(self.cfg, "overlay_monitor", 1)) - 1
+        if 0 <= idx < len(mons):
+            mon = mons[idx]
+        elif mons:
+            mon = mons[0]
+        else:
+            mon = {"left": 0, "top": 0, "width": self.winfo_screenwidth(),
+                   "height": self.winfo_screenheight(), "taskbar": 40}
+        h = max(26, min(int(mon.get("taskbar") or 40), 60))
+        w = max(120, int(getattr(self.cfg, "overlay_width", 190)))
+        corner = getattr(self.cfg, "overlay_corner", "tr")
+        gap = 4
+        bx = mon["left"] + (mon["width"] - w - gap if corner.endswith("r") else gap)
+        by = mon["top"] + (mon["height"] - h - gap if corner.startswith("b") else gap)
+        bx += int(getattr(self.cfg, "overlay_offset_x", 0))
+        by += int(getattr(self.cfg, "overlay_offset_y", 0))
+        self.minsize(80, 22)
+        self.geometry(f"{w}x{h}+{bx}+{by}")
+
+    def apply_alpha(self):
         try:
-            if self.watcher:
-                self.watcher.stop()
+            self.attributes("-topmost", True)
+            self.attributes("-alpha", float(getattr(self.cfg, "overlay_alpha", 0.85)))
         except Exception:
             pass
-        self.destroy()
+
+    def refresh_settings(self):
+        """Re-applique geometrie + transparence quand l'onglet change un reglage."""
+        self.apply_geometry()
+        self.apply_alpha()
+        self.after(40, lambda: _make_click_through(self))
+
+    def _tick(self):
+        if not self.winfo_exists():
+            return
+        self.timers.drain()
+        now = time.time()
+        for ctype, c in self.cards.items():
+            st, rem, _ = self.timers.state(ctype, now)
+            if st in ("unset", "idle"):
+                c["led"].configure(text_color="#30363d")
+                c["timer"].configure(text="--", text_color=MUTED)
+            elif st == "cooldown":
+                c["led"].configure(text_color=RED)
+                c["timer"].configure(text=mmss(rem), text_color=c["color"])
+            else:
+                c["led"].configure(text_color=GREEN)
+                c["timer"].configure(text="✓", text_color=GREEN)
+        self.after(250, self._tick)
+
+    def close(self):
+        try:
+            self.timers.stop()
+        except Exception:
+            pass
+        try:
+            self.destroy()
+        except Exception:
+            pass
 
 
 if __name__ == "__main__":

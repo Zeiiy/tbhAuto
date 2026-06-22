@@ -199,9 +199,38 @@ déplaçable.
   **`92`→élite** (boss de fin de run). `93xxxx` & co = ignorés (affichés « dernier : clé … »
   dans le statut). Ce classement est **CODE-ONLY** (non persisté, comme `grade_colors` —
   sinon un vieux `calibration.json` le masquerait).
-- **UI volontairement minimale** : deux cartes (Élite or / Normal bleu) + une ligne de statut
-  (état de surveillance + dernier coffre vu). Pas de panneau d'apprentissage : le mapping est
-  fixé dans `config.py` (corriger `chest_key_prefixes`/`chest_key_map` si un code diffère).
+- **Logique de timers extraite** dans `backend/bot/chest_timers.py` (`ChestTimers`) :
+  encapsule le `LogWatcher` + l'état (cooldowns, dernier coffre) + `state(ctype, now)` →
+  `('unset'|'idle'|'cooldown'|'ready', restant, total)`. **Partagée** par la fenêtre
+  Assistant ET l'overlay (chacun sa propre instance/watcher ; lecture seule).
+- **Fenêtre Assistant** (`AssistantWindow`, détachable) : DEUX modes, bascule
+  Détaillé ↔ Compact (bouton), mémorisée dans `config.assistant_mode` :
+  - **Détaillé** (défaut) : deux cartes (Élite or / Normal bleu) `M:SS` + barre + statut.
+  - **Compact** : petite fenêtre, deux carrés LED `●` verte=obtenable / rouge=cooldown /
+    grise=pas vu + mini timer.
+- **Overlay façon Discord** (`OverlayWindow`, depuis le 2026-06-22) — fenêtre INDÉPENDANTE,
+  pilotée **uniquement depuis l'onglet « Overlay » du menu principal** (PAS depuis l'Assistant) :
+  - **Click-through + sans focus** : `_make_click_through()` pose `WS_EX_TRANSPARENT |
+    NOACTIVATE | TOOLWINDOW | LAYERED` → les clics passent au jeu (overlay **non cliquable**)
+    ET le jeu reste actif (**le bot ne se met pas en pause**). `overrideredirect` + `-topmost` + `-alpha`.
+  - **Hauteur = barre des tâches** (work-area via `GetMonitorInfo`/`mss`), dans un **coin**
+    (`tl/tr/bl/br`) d'un **écran** choisi, **largeur** + **offset X/Y** ajustables.
+  - Réglages persistés : `overlay_enabled` / `overlay_monitor` / `_corner` / `_alpha` /
+    `_width` / `_offset_x` / `_offset_y`. L'App crée/détruit l'`OverlayWindow` via l'interrupteur
+    (`_toggle_overlay`/`_open_overlay`/`_close_overlay`) et applique les réglages à chaud
+    (`OverlayWindow.refresh_settings()`). Réouvert au démarrage si `overlay_enabled`.
+- **Nom affiché = « TBH Companion »** (constante `APP_NAME` dans `gui.py`, depuis le 2026-06-22) :
+  rebrand d'affichage uniquement (titre/en-tête/fenêtres). **Le fichier exe reste `TBHBot.exe`**
+  (l'updater/CI cherchent cet asset — le renommer casserait la maj auto des installs existantes).
+- **Temps des étages = PAS POSSIBLE depuis les logs** (vérifié le 2026-06-22 sur les 39 Mo de
+  `player.log`). Le jeu n'écrit AUCUN clear d'étage lisible : seuls les loots `GetBoxCount` le
+  sont ; toute la logique d'étage (`StageManager`, `EStageType`, `MonsterSpawnManager`) n'apparaît
+  que dans des **stack-traces obfusquées** (méthodes `iet`/`igw`/`koc`…) **sans valeurs** (ni n°
+  d'étage, ni difficulté, ni durée). Les tags `[CoreTBH_DebugLog]` ne couvrent que login/seed/save.
+  → Un onglet « derniers temps d'étage » ne pourrait venir QUE de la **vision** (OCR du « 3-8 » +
+  difficulté + chrono entre changements d'étage) — non implémenté.
+- **UI minimale, mapping fixé** dans `config.py` : pas de panneau d'apprentissage (corriger
+  `chest_key_prefixes`/`chest_key_map` si un code diffère). Classement **CODE-ONLY** (cf. ci-dessus).
 
 ## Templates (`backend/templates/`)
 
