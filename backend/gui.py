@@ -21,7 +21,7 @@ from bot.log_watch import LogWatcher, classify_chest_key
 from bot import calib_store
 from bot import updater
 
-APP_VERSION = "1.1.6"
+APP_VERSION = "1.1.7"
 
 
 def resource_dir():
@@ -243,7 +243,9 @@ class App(ctk.CTk):
         row = ctk.CTkFrame(card, fg_color="transparent")
         row.pack(fill="x", padx=16, pady=(0, 12))
         ctk.CTkLabel(row, text="Pages de stash à ranger :").pack(side="left", padx=(0, 8))
-        n = max(1, len(self.cfg.stash_page_tabs) or 4)
+        # 7 = max de pages du jeu ; le plafond est decouple du nb d'onglets calibres
+        # (les onglets sont detectes dynamiquement, "Auto" couvre n'importe quel nombre).
+        n = max(7, len(self.cfg.stash_page_tabs))
         cur = self.cfg.ranger_pages
         init = "Auto" if cur <= 0 else str(min(cur, n))
         self.ranger_pages_var = ctk.StringVar(value=init)
