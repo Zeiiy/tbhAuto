@@ -1,8 +1,13 @@
-# TBH AFK Bot — guide projet (CLAUDE.md)
+# TBH Companion — guide projet (CLAUDE.md)
 
-Bot d'auto-farming pour le jeu **TaskBarHero** (PC, Windows). Tourne en AFK la nuit,
-jeu visible au premier plan. Deux fonctions : **Auto Synthèse** (fusionne les bas
-grades) et **Auto Coffre** (ouvre les coffres).
+Compagnon pour le jeu **TaskBarHero** (PC, Windows) : aides d'auto-farming AFK +
+assistant (timers de coffres, overlay). Tourne la nuit, jeu visible au premier plan.
+Fonctions : **Auto Synthèse** (fusionne les bas grades), **Auto Coffre** (ouvre les
+coffres), **Auto Ranger**, **Assistant** (timers) et **Overlay**.
+
+> Nom **affiché** = « TBH Companion » (constante `APP_NAME` dans `gui.py`, rebrand du
+> 2026-06-22) ; le fichier exe reste **`TBHBot.exe`** (l'updater/CI cherchent cet asset —
+> le renommer casserait la maj auto). En interne le cœur reste un « bot » d'automatisation.
 
 > `README.md` = doc **utilisateur** (comment utiliser l'app) ; ce `CLAUDE.md` = doc
 > **technique** (architecture, internes). L'ancien duo web (`backend/main.py` FastAPI

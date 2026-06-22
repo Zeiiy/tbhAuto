@@ -1,8 +1,10 @@
-# TBH AFK Bot
+# TBH Companion
 
-Bot d'auto-farming pour **TaskBarHero** (Windows), conçu pour tourner en AFK la nuit,
-le jeu visible au premier plan. Application de bureau native (`TBHBot.exe`).
+Compagnon pour **TaskBarHero** (Windows) : un **assistant** (timers de coffres, overlay
+façon Discord) doublé d'**aides d'auto-farming** pour tourner en AFK la nuit, le jeu
+visible au premier plan. Application de bureau native (`TBHBot.exe`).
 
+> Le nom affiché est **TBH Companion** ; le fichier reste `TBHBot.exe`.
 > Doc technique détaillée (architecture, internes) : voir **`CLAUDE.md`**.
 
 ## Fonctions
@@ -12,11 +14,20 @@ le jeu visible au premier plan. Application de bureau native (`TBHBot.exe`).
   non voulue.
 - **Auto Coffre** — ouvre les coffres dès qu'ils apparaissent (surveillance continue).
 - **Auto Ranger** — vérifie l'inventaire ; s'il y a des items, clique « Tout Ranger »
-  page de stash par page jusqu'à ce que l'inventaire soit vide.
+  page de stash par page jusqu'à ce que l'inventaire soit vide. Les **onglets de page
+  sont détectés automatiquement** : marche quel que soit leur nombre (2, 6, 7…), sans
+  recalibrage. (Plafond réglable, ou « Auto » = toutes les pages détectées.)
 - **Assistant personnel** — fenêtre détachable (bouton en haut) qui **lit le log du jeu**
   et affiche un **compte à rebours** avant que chaque coffre soit de nouveau *obtenable*
-  (normal 5 min, élite 7 min). Elle **ne clique pas** (c'est le bot qui ouvre les coffres) ;
-  elle détecte le **loot réel** et son **type**.
+  (normal 5 min, élite 7 min). Elle **ne clique pas** ; elle détecte le **loot réel** et son
+  **type**. Deux modes (bouton de bascule) :
+  - **Détaillé** : cartes Élite/Normal avec timer `M:SS`, barre de progression et statut.
+  - **Compact** : petite fenêtre, deux carrés avec une **LED** verte (obtenable) /
+    rouge (cooldown) / grise (pas encore vu).
+- **Overlay** *(façon Discord)* — mini-barre **transparente, toujours au-dessus du jeu et
+  NON cliquable** (les clics passent au jeu → le farm n'est pas interrompu). Affiche les
+  LED + timers des coffres, à hauteur de la barre des tâches. Entièrement réglable depuis
+  l'**onglet Overlay** : on/off, écran, coin, transparence, largeur, décalage.
 
 ## Lancer
 Télécharge **`TBHBot.exe`** depuis la page **Releases** du dépôt
@@ -42,25 +53,31 @@ version se télécharge, **l'app se ferme**, et tu n'as plus qu'à **rouvrir `TB
 4. **Niveau de synthèse** réglé comme tu veux — le bot **n'y touche jamais**.
 
 ## Utilisation
-Onglet **Contrôle** : active les fonctions voulues, coche les grades à fusionner,
-règle les intervalles (synthèse / ranger en minutes) et le nombre de pages de stash,
-puis **▶ Démarrer**. Clique ensuite la fenêtre du jeu pour la mettre au premier plan
-(le bot reprend automatiquement). Le **journal** montre chaque action et chaque refus.
+**Onglet Contrôle** : active les fonctions voulues, coche les grades à fusionner,
+règle les intervalles (synthèse / ranger en minutes) et le nombre de pages de stash
+(ou « Auto »), puis **▶ Démarrer**. Clique ensuite la fenêtre du jeu pour la mettre au
+premier plan (le bot reprend automatiquement). Le **journal** montre chaque action et
+chaque refus.
 
-Onglet **Calibrage** : aperçu en direct (grilles + grade détecté), clic sur l'image
+**Onglet Overlay** : active la mini-barre transparente au-dessus du jeu et choisis
+l'**écran**, le **coin** (haut-gauche / haut-droite / bas-gauche / bas-droite), la
+**transparence**, la **largeur** et le **décalage** fin. L'overlay n'attrape aucun clic :
+tout passe au jeu, donc il n'interrompt jamais le farm.
+
+**Onglet Calibrage** : aperçu en direct (grilles + grade détecté), clic sur l'image
 pour échantillonner une couleur, et champs pour ré-ajuster les zones si besoin.
 
-Bouton **Assistant personnel** (en haut) : ouvre la fenêtre des timers de coffres
-(Élite et Normal, déjà reconnus). Elle ne réagit qu'aux loots faits **après** son
-ouverture, et indique en bas le dernier coffre vu. Les coffres tombent au hasard,
-mais ne sont *obtenables* qu'au bout du cooldown (normal 5 min, élite 7 min).
+**Bouton Assistant personnel** (en haut) : ouvre la fenêtre des timers de coffres
+(Élite et Normal). Elle ne réagit qu'aux loots faits **après** son ouverture, et indique
+en bas le dernier coffre vu. Les coffres tombent au hasard, mais ne sont *obtenables*
+qu'au bout du cooldown (normal 5 min, élite 7 min). Bascule Détaillé / Compact avec le
+bouton en haut de la fenêtre.
 
 ## Garde-fous
 - Arrêt d'urgence : **souris dans le coin haut-gauche** ou **Ctrl+Alt+K**.
 - Pause auto si le jeu n'est pas au premier plan / introuvable / écran noir.
 - Durée max configurable. Anti-veille pendant le run.
-- **Clics humanisés** : position étalée sur le bouton + déplacement de souris en
-  courbe à vitesse variable (anti-détection).
+- L'**overlay ne met pas le farm en pause** : il reste au-dessus sans prendre le focus.
 
 ## Reconstruire l'exe (développeurs)
 ```powershell
