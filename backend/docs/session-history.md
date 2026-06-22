@@ -177,3 +177,17 @@
 - Cause réelle : course entre l'extraction de `python3xx.dll` par le bootloader onefile et le scan antivirus de l'exe fraîchement réécrit, lors du relancement immédiat.
 - Solution (v1.1.4) : abandon du relancement auto. `updater.stage_replace()` installe le nouvel exe à la fermeture (bat relais qui fait `move` après l'arrêt de l'app, sans relance) ; l'utilisateur rouvre l'exe lui-même (lancement manuel = fiable à 100 %, scan AV terminé). v1.1.5 = vérification du flux, sans erreur.
 - Docs `CLAUDE.md` / `README.md` mises à jour (pourquoi pas de relance auto).
+
+### 2026-06-22 01:19
+- Détection dynamique onglets stash: nouvelle fonction `find_stash_tabs(frame, band)` dans detector.py repère onglets par couleur (R≫B) sans recalibrage, marche avec 2/6/7+ onglets
+- Modifications engine.py: `_do_tout_ranger` utilise détection dynamique avec repli sur coords calibrées (stash_page_tabs), arrêt précoce inventaire vide inchangé
+- Config updates: ranger_pages défaut `0` (Auto détection), stash_page_tabs recalibré 6 onglets (repli), gui.py menu « Auto » + 1…N pages
+- Validations: live 6 onglets détectés, synthétique 1/2/3/7 onglets OK, panneau pleine largeur rejeté (repli propre)
+- Build exe lancé (PyInstaller onefile ~68 Mo), rebuild en arrière-plan
+
+### 2026-06-22 01:20
+- Recalibrage définitif onglets stash: 6 onglets mesurés à (52, 115, 178, 241, 304, 367) x=458, incluant onglet 7e projeté + commentaire anti-dérive lors déblocages futurs
+- Finalisation détection dynamique: `_stash_tab_points()` engine.py retourne points détectés + flag, repli sur coords calibrées si détection échoue (stash fermé)
+- GUI menu ranger_pages: ajout option « Auto » (0 = toutes pages détectées, défaut), 1…N page(s), aide texte explicative « Auto = toutes les pages détectées »
+- Mise à jour CLAUDE.md section Coffres & Tout Ranger: documentation détection dynamique, onglets sans calibrage (#2/6/7), repli stash_page_tabs, plafond ranger_pages optionnel
+- Finalisation code: tous fichiers (config.py, detector.py, engine.py, gui.py, CLAUDE.md) pré-commit, prêt tests validation et exe rebuild

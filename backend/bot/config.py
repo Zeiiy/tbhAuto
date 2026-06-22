@@ -83,7 +83,7 @@ class Config:
     # Grades a fusionner, dans l'ordre de priorite. Le bot ne touche QUE ceux-la.
     synthesis_allowed_grades: List[str] = field(default_factory=lambda: ["common", "uncommon", "rare"])
     synthesis_items_needed: int = 9
-    synthesis_stash_pages: int = 4
+    synthesis_stash_pages: int = 6   # (actuellement inutilise par le code)
     # Apres K cycles de synthese sans progres (pas 9 items d'un grade autorise),
     # on espace fortement les essais pour ne pas boucler a vide.
     synthesis_max_idle_cycles: int = 3
@@ -97,8 +97,10 @@ class Config:
     # objets) sur un intervalle aleatoire, tant qu'Auto Synthese est actif.
     tout_ranger_enabled: bool = True
     tout_ranger_interval_range: Tuple[float, float] = (120.0, 300.0)  # 2 a 5 min
-    # Nombre de pages de stash sur lesquelles cliquer "Tout Ranger" (1..N onglets).
-    ranger_pages: int = 4
+    # PLAFOND optionnel de pages a ranger avec "Tout Ranger". 0 = AUTO = toutes les
+    # pages detectees (les onglets sont detectes dynamiquement, cf. _do_tout_ranger /
+    # find_stash_tabs : marche avec 2, 6, 7... onglets sans calibration). >0 = limite.
+    ranger_pages: int = 0
 
     # ===================== GEOMETRIE (a CALIBRER, coords relatives a la capture) =====================
     # Taille de la fenetre au moment de la calibration. Le bot se met en PAUSE si
@@ -117,9 +119,15 @@ class Config:
     stash_grid_rows: int = 7
     stash_grid_cols: int = 7
 
-    # Coords (centre) des onglets de page du stash, dans la capture. (CALIBRE)
+    # Coords (centre) des onglets de page du stash, dans la capture.
+    # CALIBRE 2026-06-22 : 6 onglets debloques (largeur ~56 px, ecart regulier 63 px).
+    # 7e onglet PAS ENCORE DEBLOQUE : se projette a x~430, meme y -> l'AJOUTER ici
+    # ET passer ranger_pages a 7 une fois debloque. ATTENTION : la rangee se RE-CENTRE
+    # quand un onglet s'ajoute (ancienne calib 4 onglets 54/124/188/248 -> 52/115/178/241),
+    # donc si les clics tombent a cote apres deblocage, recapturer toute la rangee.
     stash_page_tabs: List[Tuple[int, int]] = field(
-        default_factory=lambda: [(54, 461), (124, 461), (188, 461), (248, 461)])
+        default_factory=lambda: [(52, 458), (115, 458), (178, 458),
+                                 (241, 458), (304, 458), (367, 458)])
 
     # Grille de l'INVENTAIRE (source des items que "Tout Ranger" range). CALIBRE.
     inventory_grid_rect: Optional[Tuple[int, int, int, int]] = (515, 679, 417, 180)

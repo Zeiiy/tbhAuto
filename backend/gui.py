@@ -21,7 +21,7 @@ from bot.log_watch import LogWatcher, classify_chest_key
 from bot import calib_store
 from bot import updater
 
-APP_VERSION = "1.1.5"
+APP_VERSION = "1.1.6"
 
 
 def resource_dir():
@@ -244,14 +244,19 @@ class App(ctk.CTk):
         row.pack(fill="x", padx=16, pady=(0, 12))
         ctk.CTkLabel(row, text="Pages de stash à ranger :").pack(side="left", padx=(0, 8))
         n = max(1, len(self.cfg.stash_page_tabs) or 4)
-        self.ranger_pages_var = ctk.StringVar(value=str(min(self.cfg.ranger_pages, n)))
-        ctk.CTkOptionMenu(row, values=[str(i) for i in range(1, n + 1)],
-                          variable=self.ranger_pages_var, width=72,
+        cur = self.cfg.ranger_pages
+        init = "Auto" if cur <= 0 else str(min(cur, n))
+        self.ranger_pages_var = ctk.StringVar(value=init)
+        ctk.CTkOptionMenu(row, values=["Auto"] + [str(i) for i in range(1, n + 1)],
+                          variable=self.ranger_pages_var, width=96,
                           command=lambda _v: self._apply_ranger_pages()).pack(side="left")
+        ctk.CTkLabel(row, text="(Auto = toutes les pages détectées)",
+                     text_color="gray").pack(side="left", padx=(8, 0))
 
     def _apply_ranger_pages(self):
+        v = self.ranger_pages_var.get()
         try:
-            self.cfg.ranger_pages = int(self.ranger_pages_var.get())
+            self.cfg.ranger_pages = 0 if v == "Auto" else int(v)
         except ValueError:
             pass
         try:

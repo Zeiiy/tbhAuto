@@ -87,7 +87,10 @@ main — fait pour v1.1.0.) Le build local `build_exe.ps1` reste utile pour test
   uniformément. Plus de pause sur redimensionnement ; l'aperçu Calibrage affiche
   « auto-calibrage échelle ×N ».
 - Géométrie dans `config.py` : `synthesis_grid_rect` (3×3), `stash_grid_rect` (7×7),
-  `stash_page_tabs` (4 onglets), `inventory_grid_rect` (7×3, dans le panneau HERO sous
+  `stash_page_tabs` (**repli uniquement** depuis le 2026-06-22 : les onglets sont
+  désormais **détectés dynamiquement**, cf. section « Coffres & Tout Ranger » ; les 6
+  coords y restent comme repli, recalibrées le 2026-06-22),
+  `inventory_grid_rect` (7×3, dans le panneau HERO sous
   le perso). Éditable dans l'onglet *Calibrage*. Les **couleurs de grade ne sont PAS
   éditables/persistées** (code-only dans `config.py` — sinon un vieux `calibration.json`
   masquerait les corrections ; seule la géométrie + les réglages sont persistés).
@@ -156,9 +159,16 @@ s'accumulent). Garder coché le plus bas grade possédé, sinon rien ne fusionne
 - **Auto Ranger** (feature indépendante) : vérifie d'abord l'**inventaire**
   (`inventory_grid_rect`, 7×3, détecté par **luminosité du centre** via
   `GradeClassifier.has_content` — PAS `classify_grid` qui donnait des faux positifs au
-  bord). Vide → rien. Sinon clique « Tout Ranger » page par page (jusqu'à `ranger_pages`)
-  et **re-vérifie l'inventaire après chaque page**, s'arrête dès qu'il est vide.
-  Intervalle aléatoire (2-5 min).
+  bord). Vide → rien. Sinon clique « Tout Ranger » page par page et **re-vérifie
+  l'inventaire après chaque page**, s'arrête dès qu'il est vide. Intervalle aléatoire (2-5 min).
+- **Onglets de page DÉTECTÉS dynamiquement** (depuis le 2026-06-22) :
+  `detector.find_stash_tabs(frame, band)` repère les onglets par leur **couleur de
+  coffre brun/orange** (R≫B) dans une **bande dérivée de `stash_grid_rect`** (juste
+  au-dessus du quadrillage, donc suit l'échelle, **aucune calibration du nombre
+  d'onglets**). → marche avec **2, 6, 7… onglets** sur n'importe quel compte. Un segment
+  brun **pleine largeur** (ex. panneau « Chasseur ») est rejeté (`max_w`). `ranger_pages`
+  n'est plus qu'un **plafond optionnel** (`0` = AUTO = toutes les pages détectées, défaut) ;
+  `stash_page_tabs` ne sert plus que de **repli** si la détection échoue (stash fermé).
 
 ## Assistant personnel (timers de coffres) — depuis le 2026-06-19
 

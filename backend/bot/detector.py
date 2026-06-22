@@ -1,6 +1,52 @@
 import os
 import glob
 import cv2
+import numpy as np
+
+
+def find_stash_tabs(frame, band_rect, rb_min=25, r_min=60):
+    """Detecte DYNAMIQUEMENT les onglets de page du stash (sans calibration du
+    nombre d'onglets).
+
+    Les onglets sont des icones de COFFRE brun/orange, regulierement espacees,
+    dans 'band_rect' (x,y,w,h en coords frame : la bande juste au-dessus du
+    quadrillage du stash). On les repere par leur COULEUR (R nettement > B), donc
+    ca marche quel que soit le NOMBRE d'onglets (2, 6, 7...) et l'echelle, sur
+    n'importe quel compte. Renvoie les centres (cx, cy) en coords frame, tries de
+    gauche a droite. [] si rien (stash ferme / bande hors champ).
+    """
+    x, y, w, h = (int(round(v)) for v in band_rect)
+    H, W = frame.shape[:2]
+    x0, y0 = max(0, x), max(0, y)
+    x1, y1 = min(W, x + w), min(H, y + h)
+    if x1 - x0 < 4 or y1 - y0 < 4:
+        return []
+    sub = frame[y0:y1, x0:x1].astype(np.int16)
+    bb, gg, rr = sub[..., 0], sub[..., 1], sub[..., 2]
+    brown = ((rr - bb) > rb_min) & (rr > r_min)      # coffres brun/orange
+    col = brown.sum(axis=0)                           # profil horizontal (par colonne)
+    bh = y1 - y0
+    if col.max() < max(4, 0.12 * bh):
+        return []
+    thr = max(4.0, 0.12 * bh)                         # colonne suffisamment "brune"
+    on = col > thr
+    bw = x1 - x0
+    min_w = max(8, int(0.04 * bw))                    # largeur mini d'un onglet (anti-bruit)
+    max_w = max(min_w + 1, int(0.30 * bw))            # au-dela = panneau brun pleine
+    #                                                   largeur (ex parchemin "Chasseur"),
+    #                                                   PAS un onglet -> ignore.
+    centers, i, n = [], 0, len(on)
+    while i < n:
+        if on[i]:
+            j = i
+            while j < n and on[j]:
+                j += 1
+            if min_w <= j - i <= max_w:
+                centers.append((x0 + (i + j) // 2, y0 + bh // 2))
+            i = j
+        else:
+            i += 1
+    return centers
 
 
 class Detector:
@@ -62,7 +108,6 @@ class Detector:
 
     def find_all(self, frame, action, dedup_dist=18):
         """Toutes les occurrences au-dessus du seuil, dedupliquees."""
-        import numpy as np
         hits = []
         for img, w, h, _ in self.templates.get(action, []):
             t, tw, th = self._scaled(img, w, h)

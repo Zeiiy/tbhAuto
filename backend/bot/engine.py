@@ -6,7 +6,7 @@ import datetime
 import logging
 
 from .capture import Capturer
-from .detector import Detector
+from .detector import Detector, find_stash_tabs
 from .clicker import Clicker
 from .synthesis import Synthesis
 from .config import Config
@@ -175,27 +175,57 @@ class BotEngine:
                 return True
         return False
 
+    def _stash_tab_points(self, frame, sx, sy):
+        """Centres (coords frame) des onglets de page du stash.
+
+        DETECTES dynamiquement par couleur (cf. find_stash_tabs) : marche quel que
+        soit le NOMBRE d'onglets (2, 6, 7...) sur n'importe quel compte, sans
+        calibration. La BANDE de recherche est DERIVEE de stash_grid_rect (juste
+        au-dessus du quadrillage) -> suit l'echelle. Repli sur les coords calibrees
+        (stash_page_tabs) si la detection ne trouve rien (stash ferme p.ex.).
+        """
+        r = self.config.stash_grid_rect
+        if r:
+            gx, gy, gw, gh = r
+            # bande centree sur la rangee d'onglets (centre ~ gy-57, hauteur ~45) :
+            band = ((gx - 20) * sx, (gy - 80) * sy, (gw + 40) * sx, 45 * sy)
+            pts = find_stash_tabs(frame, band)
+            if pts:
+                return pts, True
+        # repli : anciennes coords calibrees, mises a l'echelle.
+        pts = [(int(t[0] * sx), int(t[1] * sy)) for t in (self.config.stash_page_tabs or [])]
+        return pts, False
+
     def _do_tout_ranger(self):
         """Range l'inventaire dans le stash, page par page, tant qu'il reste des items.
 
         1) inventaire vide -> rien a faire ;
-        2) sinon, pour chaque page (jusqu'a ranger_pages) : clique 'Tout Ranger',
-           puis RE-VERIFIE l'inventaire ; des qu'il est vide, on s'arrete.
+        2) sinon, pour chaque onglet de page DETECTE : clique l'onglet puis
+           'Tout Ranger', RE-VERIFIE l'inventaire ; des qu'il est vide, on s'arrete.
+        Le nombre de pages s'adapte tout seul au stash (detection) ; ranger_pages
+        ne sert que de PLAFOND optionnel (0 = toutes les pages detectees).
         """
         if not self._inventory_has_items():
             self.log("[ranger] inventaire vide -> rien a ranger")
             return False
-        tabs = self.config.stash_page_tabs or []
-        n = max(1, int(self.config.ranger_pages))
-        targets = tabs[:n] if tabs else [None]
         sx, sy = self.cap.scale()
+        frame, ox, oy = self.cap.grab()
+        targets, detected = self._stash_tab_points(frame, sx, sy)
+        if detected:
+            self.log(f"[ranger] {len(targets)} onglet(s) detecte(s)")
+        elif targets:
+            self.log("[ranger] onglets non detectes -> repli coords calibrees")
+        cap_n = int(self.config.ranger_pages)
+        if cap_n > 0:
+            targets = targets[:cap_n]
+        targets = targets or [None]   # [None] = onglets inconnus -> ranger page courante
         pages_done = 0
         for tab in targets:
             if self._stop.is_set():
                 break
             frame, ox, oy = self.cap.grab()
             if tab is not None:
-                self.clicker.click(ox + int(tab[0] * sx), oy + int(tab[1] * sy), radius=14)
+                self.clicker.click(ox + tab[0], oy + tab[1], radius=14)
                 time.sleep(0.4)
                 frame, ox, oy = self.cap.grab()
             m = self.det.find(frame, "tout_ranger")
