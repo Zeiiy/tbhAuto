@@ -17,12 +17,11 @@ from PIL import Image, ImageTk
 
 from bot.config import Config
 from bot.engine import BotEngine
-from bot.log_watch import classify_chest_key
 from bot.chest_timers import ChestTimers
 from bot import calib_store
 from bot import updater
 
-APP_VERSION = "1.1.8"
+APP_VERSION = "1.1.9"
 APP_NAME = "TBH Companion"   # nom affiche (titre/en-tete/fenetres). L'exe reste TBHBot.exe.
 
 
@@ -838,8 +837,8 @@ def ago(sec):
 
 
 class AssistantWindow(ctk.CTkToplevel):
-    """Fenetre detachable : timers de coffres (player.log) en mode Detaille ou Compact.
-    Ne clique jamais. L'overlay est, lui, une fenetre separee (OverlayWindow)."""
+    """Fenetre detachable : timers de coffres (vision de l'ecran) en mode Detaille ou
+    Compact. Ne clique jamais. L'overlay est, lui, une fenetre separee (OverlayWindow)."""
 
     def __init__(self, master, cfg):
         super().__init__(master)
@@ -989,9 +988,8 @@ class AssistantWindow(ctk.CTkToplevel):
 
         extra = ""
         if self.timers.last_box:
-            key, ts = self.timers.last_box
-            lbl = {"normal": "normal", "elite": "élite"}.get(
-                classify_chest_key(self.cfg, key), f"clé {key}")
+            ctype, ts = self.timers.last_box
+            lbl = {"normal": "normal", "elite": "élite"}.get(ctype, ctype)
             extra = f" · dernier : {lbl} il y a {ago(now - ts)}"
         self.status_lbl.configure(text=f"surveillance : {self.timers.status}{extra}")
 
@@ -1017,7 +1015,7 @@ class OverlayWindow(ctk.CTkToplevel):
     """Overlay facon Discord : mini-barre TOUJOURS au-dessus, TRANSPARENTE et
     CLICK-THROUGH (les clics passent au jeu -> non cliquable). Pilotee 100% depuis
     l'onglet Overlay (on/off, ecran, coin, transparence, largeur, offset). Hauteur =
-    barre des taches. Lit player.log via ChestTimers ; ne clique jamais."""
+    barre des taches. Timers via ChestTimers (vision de l'ecran) ; ne clique jamais."""
 
     def __init__(self, master, cfg):
         super().__init__(master)

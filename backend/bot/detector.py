@@ -106,6 +106,27 @@ class Detector:
                 best = (loc[0] + tw // 2, loc[1] + th // 2, float(mx), tw, th)
         return best
 
+    def find_each(self, frame, action):
+        """Meilleure occurrence PAR template de l'action : {name: (cx,cy,score,w,h)}.
+
+        find()/find_all() fusionnent toutes les variantes d'une action (ex.
+        auto_chest_1 + auto_chest_2 -> action "auto_chest") et perdent QUEL template
+        a matche. find_each garde le nom de fichier (ex. "auto_chest_1.png") en cle,
+        ce qui permet de distinguer le coffre normal (auto_chest_1) de l'elite
+        (auto_chest_2). Seuls les templates au-dessus du seuil apparaissent."""
+        out = {}
+        for img, w, h, name in self.templates.get(action, []):
+            t, tw, th = self._scaled(img, w, h)
+            if tw > frame.shape[1] or th > frame.shape[0]:
+                continue
+            res = cv2.matchTemplate(frame, t, cv2.TM_CCOEFF_NORMED)
+            _, mx, _, loc = cv2.minMaxLoc(res)
+            if mx >= self.config.match_threshold:
+                prev = out.get(name)
+                if prev is None or mx > prev[2]:
+                    out[name] = (loc[0] + tw // 2, loc[1] + th // 2, float(mx), tw, th)
+        return out
+
     def find_all(self, frame, action, dedup_dist=18):
         """Toutes les occurrences au-dessus du seuil, dedupliquees."""
         hits = []

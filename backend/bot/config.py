@@ -53,16 +53,22 @@ class Config:
 
     # ===================== ASSISTANT PERSONNEL (timers coffres) =====================
     # Mecanique du jeu : un coffre n'est lootable qu'apres un cooldown depuis le
-    # dernier loot (normal 5 min, elite 7 min). L'assistant lit le LOG du jeu EN
-    # DIRECT (player.log -> "GetBoxCount Success Count : N // ItemKey : KEY") pour
-    # connaitre le moment EXACT du loot et le TYPE (via l'ItemKey), puis affiche le
-    # compte a rebours avant "obtenable". Il ne touche JAMAIS la souris (le clic des
-    # coffres reste le travail du bot Auto Coffre, s'il est active).
+    # dernier loot (normal 5 min, elite 7 min). L'assistant SURVEILLE L'ECRAN du jeu
+    # (vision, read-only) et detecte l'APPARITION d'un coffre (auto_chest_1=normal /
+    # auto_chest_2=elite) pour relancer le compte a rebours avant "obtenable". Il ne
+    # touche JAMAIS la souris (le clic reste le travail de l'Auto Coffre, si actif).
+    # (Avant juin 2026 la source etait player.log -> "GetBoxCount ... ItemKey" ;
+    # une maj du jeu a supprime cette ligne, d'ou le passage a la vision.)
     chest_cooldowns_s: Dict[str, float] = field(default_factory=lambda: {
         "normal": 300.0,   # 5 min
         "elite": 420.0,    # 7 min
     })
+    # Veilleur vision des coffres : periode de scan (s) et delai d'absence avant de
+    # re-compter une apparition d'un meme type (anti double-comptage). Voir chest_vision.py.
+    chest_vision_poll_s: float = 0.4
+    chest_vision_rearm_s: float = 8.0
     # Chemin du player.log de TaskBarHero. None => resolution auto (AppData/LocalLow).
+    # (Plus utilise par les timers depuis le passage a la vision ; garde au cas ou.)
     game_log_path: Optional[str] = None
     # Le TYPE de coffre est donne par le PREFIXE (2 premiers chiffres de l'ItemKey) ;
     # le suffixe varie selon le grade du butin (910401/910501/910651... = meme coffre).

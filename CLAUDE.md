@@ -182,32 +182,35 @@ bouton **« Assistant personnel »** de l'en-tête. Indépendante du bot : elle 
 jamais** (le clic des coffres reste le travail d'Auto Coffre). Redimensionnable, petite,
 déplaçable.
 
-- **Source = LOG du jeu, pas la vision.** `backend/bot/log_watch.py` (`LogWatcher`) lit
-  **en direct** (tail) `%USERPROFILE%\AppData\LocalLow\TesseractStudio\TaskbarHero\player.log`
-  et repère les lignes `GetBoxCount Success Count : N // ItemKey : KEY`. Au démarrage on se
-  place en **fin de fichier** (l'historique est ignoré). Le callback tourne dans le thread
-  du watcher → passe par une **queue** lue dans la boucle `after` de la fenêtre (thread-safe Tk).
-- **Lecture BINAIRE avec seek explicite (`open("rb")` + `seek(pos)` chaque passe)** — PIÈGE :
-  le jeu garde `player.log` **ouvert** et y écrit ; en lecture *cross-process*, un `readline()`
-  texte ne revoit PAS les octets ajoutés après avoir atteint l'EOF (état EOF mis en cache →
-  « rien ne se passe »). On suit un offset d'octets, on lit `size-pos` à chaque tick, on
-  bufferise la dernière ligne incomplète, et on gère troncature/rotation (relance du jeu).
-- **Mécanique** : les coffres tombent **aléatoirement** (pas à chaque monstre/boss) mais ne
-  sont *obtenables* qu'après un cooldown depuis le dernier loot (**normal 5 min, élite 7 min**
-  → `chest_cooldowns_s`). À **chaque** acquisition de la clé d'un type, le compte à rebours
-  **repart** ; affiche `M:SS` + barre, puis **« Obtenable »** (vert) à zéro.
-- **`GetBoxCount` logue TOUS les gains de coffres** (drops, récompenses…), pas seulement les
-  coffres temporisés. Le **TYPE vient du PRÉFIXE** (2 premiers chiffres de l'ItemKey), pas de
-  la clé exacte : le **suffixe varie selon le grade du butin** (910401/910501/910651 sont tous
-  le même coffre normal). `classify_chest_key()` applique : surcharge exacte `chest_key_map`
-  (vide par défaut), sinon `chest_key_prefixes` = **`91`→normal** (monstres normaux),
-  **`92`→élite** (boss de fin de run). `93xxxx` & co = ignorés (affichés « dernier : clé … »
-  dans le statut). Ce classement est **CODE-ONLY** (non persisté, comme `grade_colors` —
-  sinon un vieux `calibration.json` le masquerait).
-- **Logique de timers extraite** dans `backend/bot/chest_timers.py` (`ChestTimers`) :
-  encapsule le `LogWatcher` + l'état (cooldowns, dernier coffre) + `state(ctype, now)` →
-  `('unset'|'idle'|'cooldown'|'ready', restant, total)`. **Partagée** par la fenêtre
-  Assistant ET l'overlay (chacun sa propre instance/watcher ; lecture seule).
+- **Source = VISION de l'écran (depuis le 2026-06-28).** `backend/bot/chest_vision.py`
+  (`ChestVisionWatcher`) ouvre **sa propre** boucle de capture read-only (`Capturer` +
+  `Detector`, thread daemon, **jamais de clic**) et détecte l'**apparition** d'un coffre :
+  `auto_chest_1`→`normal`, `auto_chest_2`→`élite` (via `Detector.find_each`, qui — contrairement
+  à `find`/`find_all` — garde QUEL template a matché). À chaque nouvelle apparition d'un type,
+  `on_chest(ctype, ts)` → **queue** lue dans la boucle `after` de la fenêtre (thread-safe Tk).
+  Auto-échelle des templates chaque passe (`det.scale` depuis `cap.scale()`), comme l'engine.
+- **POURQUOI plus le log** : avant cette date la source était `player.log`
+  (`backend/bot/log_watch.py`, ligne `GetBoxCount Success Count : N // ItemKey : KEY`). Une
+  **maj du jeu (juin 2026) a SUPPRIMÉ cette ligne** (vérifié : 0 occurrence dans un `Player.log`
+  de 294 Mo ; plus aucune clé `91xxxx/92xxxx` ; seul subsiste un signal obfusqué `InventoryProcessBox`
+  **sans ItemKey** → type indistinct). Le log ne permet donc plus ni le moment fiable ni le type.
+  `log_watch.py` reste présent (non utilisé par les timers) au cas où.
+- **Détection de FRONT MONTANT par type avec ré-armement** (`chest_vision_rearm_s`, défaut 8 s) :
+  le coffre reste ~5 s à l'écran (et le score peut scintiller) → on ne loggue qu'**une fois** par
+  apparition (on ne re-compte un type qu'après ≥ `rearm` d'absence ; 8 s ≫ présence, ≪ cooldown 300 s).
+  Poll **rapide** (`chest_vision_poll_s`, défaut 0.4 s) : quand l'Auto Coffre tourne le coffre n'est
+  visible que ~0.9 s (clic dès détection) → 0.4 s garantit ≥2 regards dans la fenêtre, on ne le rate pas.
+- **Mécanique** : les coffres tombent **aléatoirement** (pas à chaque monstre/boss) mais ne sont
+  *obtenables* qu'après un cooldown depuis le dernier loot (**normal 5 min, élite 7 min** →
+  `chest_cooldowns_s`). Le timer **repart à l'apparition** du coffre (un coffre n'apparaît que
+  cooldown écoulé → bon top de départ ; avec l'Auto Coffre actif le clic suit de <1 s). Affiche
+  `M:SS` + barre, puis **« Obtenable »** (vert) à zéro. **Type** donné par le template (plus d'ItemKey).
+- **Logique de timers** dans `backend/bot/chest_timers.py` (`ChestTimers`) : encapsule le
+  `ChestVisionWatcher` + l'état (cooldowns, dernier coffre) + `state(ctype, now)` →
+  `('unset'|'idle'|'cooldown'|'ready', restant, total)` (`unset` quasi-mort : `normal`/`élite`
+  toujours gérés tant que les templates existent). **Partagée** par la fenêtre Assistant ET
+  l'overlay (chacun sa propre instance/watcher ; lecture seule → 2 boucles de capture **légères**
+  seulement si les deux fenêtres sont ouvertes en même temps).
 - **Fenêtre Assistant** (`AssistantWindow`, détachable) : DEUX modes, bascule
   Détaillé ↔ Compact (bouton), mémorisée dans `config.assistant_mode` :
   - **Détaillé** (défaut) : deux cartes (Élite or / Normal bleu) `M:SS` + barre + statut.

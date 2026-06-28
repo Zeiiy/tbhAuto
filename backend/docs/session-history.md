@@ -230,3 +230,11 @@
 - Overlay indépendant fenêtre OverlayWindow: click-through vrai (WS_EX_TRANSPARENT), piloté depuis onglet « Overlay » menu principal
 - Onglet Overlay réglages: interrupteur on/off, écran, coin (HG/HD/BG/BD), transparence, largeur, offset X/Y (tous persistés, appliqués à chaud)
 - Logique timers extraite bot/chest_timers.py (ChestTimers) partagée Assistant+overlay ; CLAUDE.md section Assistant personnel mise à jour
+
+### 2026-06-28 06:49-07:05
+- Refonte source détection coffres: migration de `player.log` (obfusqué/ItemKey supprimé) à VISION écran en direct
+- Implémentation `chest_vision.py` (ChestVisionWatcher): boucle capture read-only + détection template `auto_chest_1`/`auto_chest_2`, front montant par type avec ré-armement 8s, poll rapide 0.4s
+- Ajout `find_each` detector.py: retourne quel template a matché (garder trace du type coffre)
+- Adaptation `chest_timers.py`: utilise ChestVisionWatcher au lieu de LogWatcher, mêmes interfaces publiques (state/on_chest/callbacks)
+- Config vision (config.py): `chest_vision_poll_s` (0.4 s), `chest_vision_rearm_s` (8 s) ; Assistant+overlay partagent instances légères
+- Validation end-to-end: détection live positive coffre normal à l'écran, timers démarrés correctement, ready status vérifié
